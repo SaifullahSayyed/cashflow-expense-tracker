@@ -109,8 +109,8 @@ export const api = {
   deleteIncome: (id: number) => apiFetch<{ message: string }>(`/income/${id}`, { method: "DELETE" }),
 
   // Budgets
-  getBudgets: (month: number, year: number) =>
-    apiFetch<Budget[]>(`/budgets?month=${month}&year=${year}`),
+  getBudgets: (params: { month: number; year: number }) =>
+    apiFetch<Budget[]>(`/budgets?month=${params.month}&year=${params.year}`),
   createBudget: (data: { category_id?: number | null; month: number; year: number; limit_amount_paise: number }) =>
     apiFetch<Budget>("/budgets", { method: "POST", body: JSON.stringify(data) }),
   updateBudget: (id: number, data: { limit_amount_paise: number }) =>
@@ -134,6 +134,7 @@ export const api = {
     payment_method: string;
     frequency: string;
     start_date: string;
+    next_due_date: string;
     end_date?: string | null;
   }) => apiFetch<RecurringRule>("/recurring", { method: "POST", body: JSON.stringify(data) }),
   updateRecurringRule: (id: number, data: Partial<RecurringRule>) =>
@@ -142,7 +143,7 @@ export const api = {
     apiFetch<{ message: string }>(`/recurring/${id}`, { method: "DELETE" }),
   processRecurringRules: (targetDate?: string) => {
     const q = targetDate ? `?target_date=${targetDate}` : "";
-    return apiFetch<{ rules_checked: number; entries_generated: number; generated_expense_ids: number[] }>(
+    return apiFetch<{ rules_checked: number; entries_generated: number; generated_expense_ids: number[]; generated_count: number }>(
       `/recurring/process${q}`,
       { method: "POST" }
     );
