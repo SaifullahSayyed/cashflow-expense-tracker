@@ -1,3 +1,4 @@
+import calendar
 from datetime import date
 from typing import List, Tuple
 from dateutil.relativedelta import relativedelta
@@ -6,16 +7,31 @@ from app.models.recurring_rule import RecurringRule
 from app.models.expense import Expense
 
 
-def advance_date(current_date: date, frequency: str) -> date:
+def advance_recurring_date(start_date: date, current_due_date: date, frequency: str) -> date:
+    """
+    Advances recurring date without permanent drift.
+    E.g. A monthly rule starting on Jan 31 goes to Feb 28, then March 31.
+    """
     if frequency == "daily":
-        return current_date + relativedelta(days=1)
+        return current_due_date + relativedelta(days=1)
     elif frequency == "weekly":
-        return current_date + relativedelta(weeks=1)
+        return current_due_date + relativedelta(weeks=1)
     elif frequency == "monthly":
-        return current_date + relativedelta(months=1)
+        year = current_due_date.year
+        month = current_due_date.month + 1
+        if month > 12:
+            month = 1
+            year += 1
+        max_days = calendar.monthrange(year, month)[1]
+        target_day = min(start_date.day, max_days)
+        return date(year, month, target_day)
     elif frequency == "yearly":
-        return current_date + relativedelta(years=1)
-    return current_date + relativedelta(months=1)
+        year = current_due_date.year + 1
+        month = start_date.month
+        max_days = calendar.monthrange(year, month)[1]
+        target_day = min(start_date.day, max_days)
+        return date(year, month, target_day)
+    return current_due_date + relativedelta(months=1)
 
 
 def process_due_rules(db: Session, target_date: date = None) -> Tuple[int, List[int]]:
@@ -62,7 +78,7 @@ def process_due_rules(db: Session, target_date: date = None) -> Tuple[int, List[
                 generated_expense_ids.append(new_expense.id)
 
             rule.last_run_date = rule.next_due_date
-            rule.next_due_date = advance_date(rule.next_due_date, rule.frequency)
+            rule.next_due_date = advance_recurring_date(rule.start_date, rule.next_due_date, rule.frequency)
 
             if rule.end_date and rule.next_due_date > rule.end_date:
                 rule.is_active = False

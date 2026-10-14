@@ -1,5 +1,6 @@
 import csv
 import io
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, date
 from typing import List, Dict, Any, Tuple
 from sqlalchemy import func
@@ -10,12 +11,22 @@ from app.schemas.export_import import CsvPreviewRow, CsvPreviewResponse, CsvImpo
 
 
 def parse_amount_to_paise(val: str) -> int:
-    """Converts a string amount (e.g. '150.50' or '150' or '1,200.00') to integer paise."""
-    cleaned = val.replace(",", "").replace("₹", "").replace("$", "").strip()
+    """
+    Converts a string amount (e.g. '1,250.50' or '150' or '₹1,250.50') to integer paise
+    using Decimal to strictly avoid floating-point errors.
+    """
+    cleaned = (
+        val.replace(",", "")
+        .replace("₹", "")
+        .replace("$", "")
+        .replace("£", "")
+        .replace("€", "")
+        .strip()
+    )
     try:
-        amt_float = float(cleaned)
-        return int(round(amt_float * 100))
-    except ValueError:
+        amt_decimal = Decimal(cleaned)
+        return int((amt_decimal * 100).to_integral_value())
+    except (InvalidOperation, ValueError):
         return 0
 
 
@@ -27,7 +38,6 @@ def parse_date_string(val: str) -> date:
             return datetime.strptime(cleaned, fmt).date()
         except ValueError:
             continue
-    # Fallback to today if unparseable
     return date.today()
 
 
@@ -45,10 +55,8 @@ def preview_csv_content(db: Session, content: str) -> CsvPreviewResponse:
 
     for row in reader:
         row_idx += 1
-        # Normalize header keys to lowercase
         norm_row = {k.strip().lower(): v.strip() for k, v in row.items() if k}
 
-        # Find columns
         raw_date = norm_row.get("date") or norm_row.get("transaction date") or norm_row.get("tx date") or ""
         parsed_date = parse_date_string(raw_date)
 

@@ -14,7 +14,6 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 
 @router.get("", response_model=List[CategoryOut])
 def get_categories(db: Session = Depends(get_db)):
-    # Fetch categories along with count of expenses
     categories = db.query(Category).all()
     results = []
     for cat in categories:
@@ -58,7 +57,6 @@ def update_category(
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
-    # Protection: protect default categories from renaming
     if category.is_default and payload.name and payload.name.lower() != category.name.lower():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -101,28 +99,28 @@ def delete_category(
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
-    # Protection: protect default categories from deletion
     if category.is_default:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Default category '{category.name}' cannot be deleted"
         )
 
-    # Check for linked expenses
     linked_expenses_count = db.query(func.count(Expense.id)).filter(
         Expense.category_id == category_id
     ).scalar() or 0
 
     if linked_expenses_count > 0:
         if not reassign_to:
-            # Fallback to 'Other' default category if not specified
-            other_cat = db.query(Category).filter(Category.name == "Other").first()
-            if not other_cat or other_cat.id == category_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Category has {linked_expenses_count} linked expenses. Specify 'reassign_to' category ID."
-                )
-            reassign_to = other_cat.id
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Category '{category.name}' has {linked_expenses_count} linked expense(s). Please specify 'reassign_to' to reassign them."
+            )
+
+        if reassign_to == category_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot reassign expenses to the category being deleted"
+            )
 
         target_cat = db.query(Category).filter(Category.id == reassign_to).first()
         if not target_cat:

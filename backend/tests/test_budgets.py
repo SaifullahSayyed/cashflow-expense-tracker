@@ -14,14 +14,11 @@ def test_create_and_update_budgets(client):
     assert overall["category_id"] is None
     assert overall["limit_amount_paise"] == 5000000
 
-    # 2. Upsert overall monthly budget (should update, not duplicate)
-    up_res = client.post("/api/v1/budgets", json={
-        "category_id": None,
-        "month": 10,
-        "year": 2026,
+    # 2. Update overall monthly budget via PUT endpoint
+    up_res = client.put(f"/api/v1/budgets/{overall['id']}", json={
         "limit_amount_paise": 6000000  # Updated cap
     })
-    assert up_res.status_code == 201
+    assert up_res.status_code == 200
     assert up_res.json()["limit_amount_paise"] == 6000000
     assert up_res.json()["id"] == overall["id"]
 
